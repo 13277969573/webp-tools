@@ -121,6 +121,14 @@ class WebpTools:
         self.quality = tk.StringVar(value="80")
         ttk.Entry(self.convert_frame, textvariable=self.quality, width=10).pack()
         
+        # 添加放大裁剪选项
+        self.create_zoomed = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            self.convert_frame, 
+            text="同时创建放大(1.5倍)裁剪版本 (960x540)", 
+            variable=self.create_zoomed
+        ).pack(pady=10)
+        
         # 转换按钮
         ttk.Button(self.convert_frame, text="转换为WEBP", command=self.convert_to_webp).pack(pady=20)
     
@@ -183,9 +191,16 @@ class WebpTools:
             convert_png_to_webp(
                 self.png_path.get(),
                 self.convert_output_path.get(),
-                quality
+                quality,
+                self.create_zoomed.get()
             )
-            messagebox.showinfo("成功", "转换完成!")
+            
+            # 构建成功消息
+            success_msg = "转换完成!"
+            if self.create_zoomed.get():
+                success_msg += "\n同时创建了放大裁剪版本 (960x540)"
+            
+            messagebox.showinfo("成功", success_msg)
         except Exception as e:
             messagebox.showerror("错误", f"转换失败: {str(e)}")
     
