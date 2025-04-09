@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-def convert_png_to_webp(input_path, output_path=None, min_quality=80, create_zoomed=False):
+def convert_png_to_webp(input_path, output_path=None, min_quality=80, create_cropped=False, crop_ratio=4):
     """
     将PNG图片转换为WEBP格式，优先保证清晰度
     
@@ -11,7 +11,8 @@ def convert_png_to_webp(input_path, output_path=None, min_quality=80, create_zoo
         input_path: 输入PNG文件路径或目录
         output_path: 输出路径（可选）
         min_quality: 最低质量限制（默认80，范围0-100）
-        create_zoomed: 是否创建放大并裁剪的版本（默认False）
+        create_cropped: 是否创建中心裁剪版本（默认False）
+        crop_ratio: 裁剪比率，原图的 1/n（默认为4）
     """
     try:
         # 如果输入是目录，则批量处理
@@ -32,8 +33,8 @@ def convert_png_to_webp(input_path, output_path=None, min_quality=80, create_zoo
             for png_file in input_dir.glob('*.png'):
                 try:
                     webp_file = output_dir / f"{png_file.stem}.webp"
-                    zoomed_webp_file = output_dir / f"{png_file.stem}_zoomed.webp" if create_zoomed else None
-                    convert_single_file(png_file, webp_file, min_quality, zoomed_webp_file)
+                    cropped_webp_file = output_dir / f"{png_file.stem}_cropped.webp" if create_cropped else None
+                    convert_single_file(png_file, webp_file, min_quality, cropped_webp_file, crop_ratio)
                     success_count += 1
                 except Exception as e:
                     print(f"转换失败 {png_file.name}: {str(e)}")
@@ -57,17 +58,17 @@ def convert_png_to_webp(input_path, output_path=None, min_quality=80, create_zoo
                 except Exception as e:
                     raise Exception(f"无法创建输出目录 {output_dir}: {str(e)}")
                 output_file = output_dir / f"{input_file.stem}.webp"
-                zoomed_output_file = output_dir / f"{input_file.stem}_zoomed.webp" if create_zoomed else None
+                cropped_output_file = output_dir / f"{input_file.stem}_cropped.webp" if create_cropped else None
             else:
                 output_file = input_file.with_suffix('.webp')
-                zoomed_output_file = input_file.parent / f"{input_file.stem}_zoomed.webp" if create_zoomed else None
+                cropped_output_file = input_file.parent / f"{input_file.stem}_cropped.webp" if create_cropped else None
             
-            convert_single_file(input_file, output_file, min_quality, zoomed_output_file)
+            convert_single_file(input_file, output_file, min_quality, cropped_output_file, crop_ratio)
             
     except Exception as e:
         raise Exception(f"转换失败: {str(e)}")
 
-def convert_single_file(input_file, output_file, min_quality, zoomed_output_file=None):
+def convert_single_file(input_file, output_file, min_quality, cropped_output_file=None, crop_ratio=4):
     """转换单个文件"""
     try:
         # 打开PNG图片
@@ -82,42 +83,39 @@ def convert_single_file(input_file, output_file, min_quality, zoomed_output_file
             # 保存原始图片为WEBP
             save_optimized_webp(img, output_file, min_quality, original_size)
             
-            # 如果需要创建放大并裁剪的版本
-            if zoomed_output_file:
-                create_zoomed_version(img, zoomed_output_file, min_quality)
+            # 如果需要创建裁剪版本
+            if cropped_output_file:
+                create_cropped_version(img, cropped_output_file, min_quality, crop_ratio)
             
     except Exception as e:
         raise Exception(f"处理文件失败: {str(e)}")
 
-def create_zoomed_version(img, output_file, min_quality):
-    """创建放大并裁剪到960x540的版本"""
+def create_cropped_version(img, output_file, min_quality, crop_ratio=4):
+    """创建裁剪版本，裁剪为原图的 1/crop_ratio 大小"""
     try:
         # 获取原始尺寸
         width, height = img.size
         
-        # 放大1.5倍
-        zoomed_img = img.resize((int(width * 1.5), int(height * 1.5)), Image.Resampling.LANCZOS)
-        
         # 计算裁剪区域（以中心点为基准）
-        target_width, target_height = 960, 540
-        left = (zoomed_img.width - target_width) // 2
-        top = (zoomed_img.height - target_height) // 2
+        target_width = width // crop_ratio
+        target_height = height // crop_ratio
+        left = (width - target_width) // 2
+        top = (height - target_height) // 2
         right = left + target_width
         bottom = top + target_height
         
         # 裁剪图片
-        cropped_img = zoomed_img.crop((left, top, right, bottom))
+        cropped_img = img.crop((left, top, right, bottom))
         
         # 保存为WEBP
         save_optimized_webp(cropped_img, output_file, min_quality)
         
-        print(f"创建放大裁剪版本: {output_file}")
-        print(f"放大倍率: 1.5倍")
-        print(f"尺寸: 960x540")
+        print(f"创建裁剪版本: {output_file}")
+        print(f"裁剪尺寸: {target_width}x{target_height} (原图的 1/{crop_ratio})")
         print("-" * 50)
         
     except Exception as e:
-        raise Exception(f"创建放大版本失败: {str(e)}")
+        raise Exception(f"创建裁剪版本失败: {str(e)}")
 
 def save_optimized_webp(img, output_file, min_quality, original_size=None):
     """使用二分查找寻找最佳质量参数并保存WEBP"""
@@ -200,7 +198,7 @@ if __name__ == "__main__":
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
     
     try:
-        convert_png_to_webp(input_path, output_path, create_zoomed=True)
+        convert_png_to_webp(input_path, output_path, create_cropped=True, crop_ratio=4)
     except Exception as e:
         print(f"错误: {str(e)}")
         sys.exit(1) 

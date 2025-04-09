@@ -121,13 +121,20 @@ class WebpTools:
         self.quality = tk.StringVar(value="80")
         ttk.Entry(self.convert_frame, textvariable=self.quality, width=10).pack()
         
-        # 添加放大裁剪选项
-        self.create_zoomed = tk.BooleanVar(value=True)
+        # 添加裁剪比率设置
+        crop_frame = ttk.Frame(self.convert_frame)
+        crop_frame.pack(pady=5)
+        ttk.Label(crop_frame, text="裁剪比率 (1/n):").pack(side='left')
+        self.crop_ratio = tk.StringVar(value="4")
+        ttk.Entry(crop_frame, textvariable=self.crop_ratio, width=5).pack(side='left', padx=5)
+        
+        # 添加裁剪选项
+        self.create_cropped = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             self.convert_frame, 
-            text="同时创建放大(1.5倍)裁剪版本 (960x540)", 
-            variable=self.create_zoomed
-        ).pack(pady=10)
+            text="同时创建中心裁剪版本", 
+            variable=self.create_cropped
+        ).pack(pady=5)
         
         # 转换按钮
         ttk.Button(self.convert_frame, text="转换为WEBP", command=self.convert_to_webp).pack(pady=20)
@@ -188,17 +195,28 @@ class WebpTools:
                 messagebox.showerror("错误", "质量值必须在1-100之间!")
                 return
             
+            # 验证裁剪比率
+            try:
+                crop_ratio = int(self.crop_ratio.get())
+                if crop_ratio < 2:
+                    messagebox.showerror("错误", "裁剪比率必须大于或等于2!")
+                    return
+            except ValueError:
+                messagebox.showerror("错误", "裁剪比率必须是整数!")
+                return
+            
             convert_png_to_webp(
                 self.png_path.get(),
                 self.convert_output_path.get(),
                 quality,
-                self.create_zoomed.get()
+                self.create_cropped.get(),
+                crop_ratio
             )
             
             # 构建成功消息
             success_msg = "转换完成!"
-            if self.create_zoomed.get():
-                success_msg += "\n同时创建了放大裁剪版本 (960x540)"
+            if self.create_cropped.get():
+                success_msg += f"\n同时创建了中心裁剪版本 (原图的 1/{crop_ratio} 大小)"
             
             messagebox.showinfo("成功", success_msg)
         except Exception as e:
